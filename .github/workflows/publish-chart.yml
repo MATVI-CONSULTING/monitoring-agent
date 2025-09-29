@@ -13,29 +13,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout du repo
+      # 1️⃣ Checkout du repo avec tout l’historique (important pour tagger)
       - name: Checkout repository
         uses: actions/checkout@v3
-
-      # 2️⃣ Installer Helm
-      - name: Install Helm
-        uses: azure/setup-helm@v3
         with:
-          version: v3.19.0
+          fetch-depth: 0
 
-      # 3️⃣ Packager le chart
+      # 2️⃣ Installer Helm et yq
+      - name: Install tools
+        run: |
+          sudo snap install helm --classic
+          sudo snap install yq
+
+      # 3️⃣ Extraire la version du Chart.yaml
+      - name: Extract Chart version
+        id: chart
+        run: |
+          VERSION=$(yq '.version' monitoring-agent/Chart.yaml)
+          echo "chart_version=$VERSION" >> $GITHUB_OUTPUT
+
+      # 4️⃣ Créer un tag Git s’il n’existe pas déjà
+      - name: Create Git tag
+        run: |
+          TAG="v${{ steps.chart.outputs.chart_version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping."
+          else
+            git config user.name "github-actions"
+            git config user.email "actions@github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
+
+      # 5️⃣ Packager le chart
       - name: Package Helm chart
         run: |
           helm package monitoring-agent
           mkdir -p charts
           mv monitoring-agent-*.tgz charts/
 
-      # 4️⃣ Créer ou mettre à jour l'index.yaml
+      # 6️⃣ Générer ou mettre à jour l'index.yaml
       - name: Generate Helm repo index
         run: |
           helm repo index charts --url https://matvi-consulting.github.io/monitoring-agent/charts
 
-      # 5️⃣ Commit et push sur gh-pages
+      # 7️⃣ Publier sur gh-pages
       - name: Push to gh-pages
         uses: peaceiris/actions-gh-pages@v6
         with:
@@ -43,3 +65,13 @@ jobs:
           publish_dir: ./charts
           destination_dir: .
           publish_branch: gh-pages
+
+      # 8️⃣ Créer une Release GitHub (même si le tag existait déjà)
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.chart.outputs.chart_version }}
+          name: "Helm Chart v${{ steps.chart.outputs.chart_version }}"
+          files: charts/monitoring-agent-*.tgz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

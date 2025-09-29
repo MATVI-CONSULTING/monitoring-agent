@@ -9,6 +9,7 @@ agent:
     username: ""
     password: ""
   intervalSeconds: 15
+  
   # Grouping labels ajoutées au chemin Pushgateway
   labels:
     # par défaut, on injectera .Release.Namespace au runtime si 'cluster' est vide

@@ -1,0 +1,10 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "chart.fullname" . }}-kubelet-cadvisor-pusher
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["nodes/proxy","nodes/metrics","nodes"]
+  verbs: ["get","list","watch"]

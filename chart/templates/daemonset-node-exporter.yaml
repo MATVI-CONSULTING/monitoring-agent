@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "chart.fullname" . }}-node-exporter
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app: node-exporter
+  template:
+    metadata:
+      labels:
+        {{- include "chart.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        app: node-exporter
+    spec:
+      hostPID: true
+      hostNetwork: true
+      tolerations:
+        - operator: "Exists"
+      containers:
+        - name: node-exporter
+          image: {{ .Values.nodeExporter.image }}
+          args:
+            - '--path.rootfs=/host'
+            - '--path.procfs=/host/proc'
+            - '--path.sysfs=/host/sys'
+            - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)'
+            - '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$$'
+          ports:
+            - name: metrics
+              containerPort: 9100
+          resources:
+            {{- toYaml .Values.nodeExporter.resources | nindent 12 }}
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: rootfs
+              mountPath: /host
+              readOnly: true
+            - name: sysfs
+              mountPath: /host/sys
+              readOnly: true
+            - name: procfs
+              mountPath: /host/proc
+              readOnly: true
+            - name: devfs
+              mountPath: /host/dev
+              readOnly: true
+        - name: agent
+          image: {{ .Values.agent.image }}
+          env:
+            - name: AGENT_URL
+              value: {{ .Values.agent.url | quote }}
+            - name: AGENT_INTERVAL
+              value: "{{ .Values.agent.intervalSeconds }}"
+            - name: SCRAPE_URL
+              value: "http://127.0.0.1:9100/metrics"
+            - name: JOB_NAME
+              value: "node-exporter"
+            - name: INSTANCE
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CLUSTER
+              value: "{{ default .Release.Namespace .Values.agent.labels.cluster }}"
+            - name: CLIENT
+              value: "{{ default .Release.Namespace .Values.agent.labels.client }}"
+            - name: ENV
+              value: "{{ .Values.agent.labels.env }}"
+            - name: AGENT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: username
+            - name: AGENT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: password
+          command: ["/bin/sh","-c"]
+          args:
+            - |
+              set -eu
+              while true; do
+                curl -fsS ${SCRAPE_URL} \
+                | curl -fsS -u "${AGENT_USER}:${AGENT_PASS}" -X PUT \
+                    --data-binary @- \
+                    "${AGENT_URL}/metrics/job/${JOB_NAME}/instance/${INSTANCE}/client/${CLIENT}/cluster/${CLUSTER}/env/${ENV}" || true
+                sleep "${AGENT_INTERVAL}"
+              done
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+      volumes:
+        - name: rootfs
+          hostPath:
+            path: /
+            type: Directory
+        - name: sysfs
+          hostPath:
+            path: /sys
+            type: Directory
+        - name: runfs
+          hostPath:
+            path: /run
+            type: Directory
+        - name: procfs
+          hostPath:
+            path: /proc
+            type: Directory
+        - name: devfs
+          hostPath:
+            path: /dev
+            type: Directory
+

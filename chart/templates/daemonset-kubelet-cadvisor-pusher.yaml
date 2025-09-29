@@ -1,0 +1,135 @@
+{{- if .Values.kubeletCadvisorPusher.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "chart.fullname" . }}-kubelet-cadvisor-pusher
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app: kubelet-cadvisor-pusher
+  template:
+    metadata:
+      labels:
+        {{- include "chart.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        app: kubelet-cadvisor-pusher
+    spec:
+      serviceAccountName: {{ include "chart.fullname" . }}-kubelet-cadvisor-pusher
+      containers:
+        - name: agent
+          image: {{ .Values.kubeletCadvisorPusher.image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: API_SERVER
+              value: "https://kubernetes.default.svc"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: AGENT_URL
+              value: {{ .Values.agent.url | quote }}
+            - name: AGENT_INTERVAL
+              value: "{{ .Values.agent.intervalSeconds }}"
+            - name: JOB_NAME
+              value: "cadvisor"
+            - name: INSTANCE
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CLUSTER
+              value: "{{ default .Release.Namespace .Values.agent.labels.cluster }}"
+            - name: CLIENT
+              value: "{{ default .Release.Namespace .Values.agent.labels.client }}"
+            - name: ENV
+              value: "{{ .Values.agent.labels.env }}"
+            - name: AGENT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: username
+            - name: AGENT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: password
+          command: ["/bin/sh","-c"]
+          args:
+            - |
+              set -eu
+              TOKEN_FILE=/var/run/secrets/kubernetes.io/serviceaccount/token
+              CA_CERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+              urlenc() { # encode minimal: %, /, espace (BusyBox-compatible)
+                printf '%s' "$1" | sed -r 's/%/%25/g; s,/,%2F,g; s, ,%20,g'
+              }
+
+              SAFE_CLUSTER="$(urlenc "${CLUSTER}")"
+              SAFE_ENV="$(urlenc "${ENV}")"
+
+              while true; do
+                AUTH="Authorization: Bearer $(cat "${TOKEN_FILE}")"
+                TMP="$(mktemp)"
+
+                # 1) Scrape cAdvisor via kubelet proxy
+                if curl -fsS --cacert "${CA_CERT}" -H "$AUTH" \
+                    "${API_SERVER}/api/v1/nodes/${NODE_NAME}/proxy/metrics/cadvisor" \
+                    -o "${TMP}"; then
+
+                  # 2) Ne pousse pas si vide
+                  if [ ! -s "${TMP}" ]; then
+                    rm -f "${TMP}"; sleep "${AGENT_INTERVAL}"; continue
+                  fi
+
+                  # 3) Retirer les exemplars (tout ce qui suit ' # ...' sur les lignes d'échantillons)
+                  #    et sanitiser les labels réservés 'job'/'instance' du body
+                  #    (BusyBox sed -r)
+                  sed -ri 's/[[:space:]]+#.*$//' "${TMP}"
+                  sed -ri 's/, *job="[^"]*"//g; s/, *instance="[^"]*"//g' "${TMP}"
+                  sed -ri 's/\{ *job="[^"]*",/\{/' "${TMP}"
+                  sed -ri 's/\{ *instance="[^"]*",/\{/' "${TMP}"
+                  sed -ri 's/\{ *job="[^"]*" *\}/\{\}/' "${TMP}"
+                  sed -ri 's/\{ *instance="[^"]*" *\}/\{\}/' "${TMP}"
+
+                  # 4) Retirer les TIMESTAMPS en fin de ligne
+                  #    Règle: si les 2 *derniers* champs sont numériques -> supprimer le dernier (timestamp)
+                  #    Compatible BusyBox awk.
+                  TMP2="$(mktemp)"
+                  awk '
+                    BEGIN{OFS=" "}
+                    /^#/ {print; next}
+                    NF==0 {print; next}
+                    {
+                      v=$(NF-1); t=$NF
+                      # numériques simples (int/float/exposant pour la valeur); timestamp numérique simple
+                      if (v ~ /^-?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/ && t ~ /^[0-9]+([.][0-9]+)?$/) {
+                        $NF=""; sub(/[ \t]+$/,"")
+                      }
+                      print
+                    }' "${TMP}" > "${TMP2}" || cp "${TMP}" "${TMP2}"
+                  mv "${TMP2}" "${TMP}"
+
+                  # 5) Push + log si !=2xx
+                  HTTP_CODE="$(
+                    curl -sS -o /tmp/agent.out -w "%{http_code}" \
+                      -u "${AGENT_USER}:${AGENT_PASS}" -X PUT \
+                      -H 'Content-Type: text/plain; version=0.0.4; charset=utf-8' \
+                      --data-binary @"${TMP}" \
+                      "${AGENT_URL}/metrics/job/${JOB_NAME}/instance/${INSTANCE}/client/${CLIENT}/cluster/${SAFE_CLUSTER}/env/${SAFE_ENV}" \
+                    || echo "000"
+                  )"
+                  if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+                    echo "agent error ${HTTP_CODE}: $(tail -c 2000 /tmp/agent.out 2>/dev/null || true)" >&2
+                  fi
+                fi
+
+                rm -f "${TMP}" /tmp/agent.out 2>/dev/null || true
+                sleep "${AGENT_INTERVAL}"
+              done
+          resources:
+            {{- toYaml .Values.kubeletCadvisorPusher.resources | nindent 12 }}
+{{- end }}

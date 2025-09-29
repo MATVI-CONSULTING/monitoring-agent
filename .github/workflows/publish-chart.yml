@@ -1,0 +1,45 @@
+name: Publish Helm Chart
+
+on:
+  push:
+    branches:
+      - helm-chart
+    paths:
+      - 'monitoring-agent/**'
+      - 'charts/**'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout du repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Installer Helm
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.19.0
+
+      # 3️⃣ Packager le chart
+      - name: Package Helm chart
+        run: |
+          helm package monitoring-agent
+          mkdir -p charts
+          mv monitoring-agent-*.tgz charts/
+
+      # 4️⃣ Créer ou mettre à jour l'index.yaml
+      - name: Generate Helm repo index
+        run: |
+          helm repo index charts --url https://matvi-consulting.github.io/monitoring-agent/charts
+
+      # 5️⃣ Commit et push sur gh-pages
+      - name: Push to gh-pages
+        uses: peaceiris/actions-gh-pages@v6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./charts
+          destination_dir: .
+          publish_branch: gh-pages

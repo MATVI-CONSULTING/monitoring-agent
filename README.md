@@ -7,7 +7,7 @@ Agent privé permettant de récupérer les métriques système (CPU, mémoire, d
 Ajoutez le dépôt Helm et installez le chart :
 
 ```bash
-helm repo add matvi-monitoring-agent https://matvi-consulting.github.io/monitoring-agent/charts
+helm repo add matvi-charts https://charts.matvi-consulting.com
 helm repo update
 helm install my-agent matvi-monitoring-agent/matvi-monitoring-agent
 ```

@@ -11,19 +11,23 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
+        # 1️⃣ Checkout the repository
       - name: Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
+        # 2️⃣ Set up Git
       - name: Configure Git
         run: |
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
+        # 3️⃣ Install Helm and run chart-releaser
       - name: Install Helm
         uses: azure/setup-helm@v3
 
+        # 4️⃣ Run chart-releaser to package and publish the Helm chart
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0
         with:

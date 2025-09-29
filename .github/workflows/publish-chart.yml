@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - helm-chart
-    paths:
-      - 'monitoring-agent/**'
-      - 'charts/**'
 
 jobs:
   publish:

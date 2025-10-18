@@ -22,7 +22,7 @@ spec:
       serviceAccountName: {{ include "chart.fullname" . }}-kubelet-cadvisor-pusher
       containers:
         - name: agent
-          image: {{ .Values.kubeletCadvisorPusher.image }}
+          image: {{ .Values.agent.image }}
           imagePullPolicy: IfNotPresent
           env:
             - name: ENABLE_CADVISOR

@@ -30,14 +30,10 @@ spec:
         - name: agent
           image: {{ .Values.agent.image }}
           env:
-            - name: AGENT_URL
-              value: {{ .Values.agent.url | quote }}
-            - name: AGENT_INTERVAL
-              value: "{{ .Values.agent.intervalSeconds }}"
+            - name: ENABLE_KUBE_STATE_METRICS
+              value: "true"
             - name: SCRAPE_URL
               value: "http://127.0.0.1:8080/metrics"
-            - name: JOB_NAME
-              value: "kube-state-metrics"
             - name: INSTANCE
               valueFrom:
                 fieldRef:
@@ -46,28 +42,17 @@ spec:
               value: "{{ default .Release.Namespace .Values.agent.labels.cluster }}"
             - name: ENV
               value: "{{ .Values.agent.labels.env }}"
-            - name: CLIENT
+            - name: CUSTOMER_NAME
               value: "{{ default .Release.Namespace .Values.agent.labels.client }}"
             - name: AGENT_USER
               valueFrom:
                 secretKeyRef:
                   name: {{ include "chart.fullname" . }}-agent-basic-auth
                   key: username
-            - name: AGENT_PASS
+            - name: AGENT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "chart.fullname" . }}-agent-basic-auth
                   key: password
-          command: ["/bin/sh","-c"]
-          args:
-            - |
-              set -eu
-              while true; do
-                curl -fsS ${SCRAPE_URL} \
-                | curl -fsS -u "${AGENT_USER}:${AGENT_PASS}" -X PUT \
-                    --data-binary @- \
-                    "${AGENT_URL}/metrics/job/${JOB_NAME}/instance/${INSTANCE}/client/${CLIENT}/cluster/${CLUSTER}/env/${ENV}" || true
-                sleep "${AGENT_INTERVAL}"
-              done
           resources:
             {{- toYaml .Values.agent.resources | nindent 12 }}

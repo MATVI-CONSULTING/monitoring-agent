@@ -34,7 +34,6 @@ kubeStateMetrics:
 
 kubeletCadvisorPusher:
   enabled: true
-  image: "curlimages/curl:8.16.0"
   resources:
     requests: { cpu: 20m, memory: 32Mi }
     limits:   { cpu: 100m, memory: 64Mi }

@@ -114,6 +114,29 @@ echo "$RELEASE_NOTES" | gh release create "$TAG" \
 
 print_info "✓ Release $VERSION created successfully!"
 print_info "The GitHub Action will now build and publish the Docker image."
+
+# Merge helm-chart into gh-pages
+print_info "Merging helm-chart branch into gh-pages..."
+ORIGINAL_BRANCH="$CURRENT_BRANCH"
+
+# Fetch latest changes
+git fetch origin
+
+# Checkout gh-pages
+git checkout gh-pages
+git pull origin gh-pages
+
+# Merge helm-chart into gh-pages
+git merge origin/helm-chart -m "Merge helm-chart for release $VERSION"
+
+# Push to gh-pages
+git push origin gh-pages
+
+# Return to original branch
+git checkout "$ORIGINAL_BRANCH"
+
+print_info "✓ Successfully merged helm-chart into gh-pages"
+
 print_info ""
 print_info "View release: $(gh release view "$TAG" --web 2>&1 | grep -o 'https://.*')"
 print_info "Image will be available at: ghcr.io/$(gh repo view --json nameWithOwner -q .nameWithOwner | tr '[:upper:]' '[:lower:]'):$VERSION"

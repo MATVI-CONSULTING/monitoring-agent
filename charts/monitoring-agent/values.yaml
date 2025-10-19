@@ -18,6 +18,12 @@ agent:
   resources:
     requests: { cpu: 20m, memory: 32Mi }
     limits:   { cpu: 100m, memory: 64Mi }
+  nodeExporter:
+    pushInterval: 15
+  cadvisor:
+    pushInterval: 0
+  kubeStateMetrics:
+    pushInterval: 0
 
 nodeExporter:
   image: "quay.io/prometheus/node-exporter:v1.9.1"

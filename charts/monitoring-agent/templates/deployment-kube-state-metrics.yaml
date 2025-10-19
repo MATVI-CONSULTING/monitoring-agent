@@ -34,6 +34,8 @@ spec:
               value: "true"
             - name: SCRAPE_URL
               value: "http://127.0.0.1:8080/metrics"
+            - name: PUSH_INTERVAL
+              value: "{{ .Values.agent.kubeStateMetrics.pushInterval }}"
             - name: INSTANCE
               valueFrom:
                 fieldRef:

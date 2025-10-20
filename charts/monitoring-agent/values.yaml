@@ -19,7 +19,7 @@ agent:
     requests: { cpu: 20m, memory: 32Mi }
     limits:   { cpu: 100m, memory: 64Mi }
   nodeExporter:
-    pushInterval: 15
+    pushInterval: 0
   cadvisor:
     pushInterval: 0
   kubeStateMetrics:

@@ -16,8 +16,8 @@ agent:
     env: ""
     client: ""
   resources:
-    requests: { cpu: 20m, memory: 32Mi }
-    limits:   { cpu: 100m, memory: 64Mi }
+    requests: { cpu: 200m, memory: 50Mi }
+    limits:   { cpu: 250m, memory: 100Mi }
   nodeExporter:
     pushInterval: 0
   cadvisor:
@@ -41,8 +41,8 @@ kubeStateMetrics:
 kubeletCadvisorPusher:
   enabled: true
   resources:
-    requests: { cpu: 20m, memory: 32Mi }
-    limits:   { cpu: 100m, memory: 64Mi }
+    requests: { cpu: 50m, memory: 32Mi }
+    limits:   { cpu: 200m, memory: 64Mi }
   filters:
     include: []   # e.g. ['^(container_cpu_|container_memory_)']
     exclude: []   # e.g. ['^container_network_.*']

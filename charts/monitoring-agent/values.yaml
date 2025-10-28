@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 agent:
-  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.1.7"
+  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.1.8"
   url: "https://push.prod.matvi-consulting.com"   # sans le suffixe /metrics
   basicAuth:
     username: ""
@@ -19,11 +19,11 @@ agent:
     requests: { cpu: 200m, memory: 50Mi }
     limits:   { cpu: 250m, memory: 100Mi }
   nodeExporter:
-    pushInterval: 15
+    pushInterval: 10
   cadvisor:
-    pushInterval: 15
+    pushInterval: 10
   kubeStateMetrics:
-    pushInterval: 15
+    pushInterval: 10
 
 nodeExporter:
   image: "quay.io/prometheus/node-exporter:v1.9.1"

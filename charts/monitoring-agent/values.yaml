@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 agent:
-  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.1.4"
+  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.1.5"
   url: "https://push.prod.matvi-consulting.com"   # sans le suffixe /metrics
   basicAuth:
     username: ""

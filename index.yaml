@@ -3,6 +3,16 @@ entries:
   matvi-monitoring-agent:
   - apiVersion: v2
     appVersion: 1.1.8
+    created: "2025-10-30T20:52:51.390820087Z"
+    description: Matvi Monitoring agent Helm chart for Kubernetes
+    digest: f3a86394a755dc4bafe4a8474442cd9ee250886825ede0ffc3057406302e6180
+    name: matvi-monitoring-agent
+    type: application
+    urls:
+    - matvi-monitoring-agent-0.2.15.tgz
+    version: 0.2.15
+  - apiVersion: v2
+    appVersion: 1.1.8
     created: "2025-10-29T08:12:03.357239082Z"
     description: Matvi Monitoring agent Helm chart for Kubernetes
     digest: 8fd3cc50791bd3cf51b3398b3d4b839f7dd40e58059f664278cdea046ee816e1
@@ -191,4 +201,58 @@ entries:
     urls:
     - matvi-monitoring-agent-0.1.5.tgz
     version: 0.1.5
-generated: "2025-10-29T08:12:03.357386748Z"
+  redis:
+  - annotations:
+      artifacthub.io/category: database
+      artifacthub.io/changes: |2
+            - kind: changed
+              description: "Add support for Redis Cluster (#507)"
+              links:
+                - name: "Commit c1e9fa8"
+                  url: "https://github.com/CloudPirates-io/helm-charts/commit/c1e9fa8"
+      artifacthub.io/containsSecurityUpdates: "false"
+      artifacthub.io/links: |
+        - name: Redis
+          url: https://redis.io
+        - name: Helm Chart
+          url: https://github.com/CloudPirates-io/helm-charts/tree/main/charts/redis
+        - name: Application
+          url: https://github.com/redis/redis
+        - name: Maintainer CloudPirates
+          url: https://www.cloudpirates.io
+      artifacthub.io/signKey: |
+        fingerprint: 6917f1a88c122cbb1de5aa55457752135bdcf95a
+        url: https://raw.githubusercontent.com/CloudPirates-io/helm-charts/refs/heads/main/cosign.pub
+      license: Apache-2.0
+    apiVersion: v2
+    appVersion: 8.2.2
+    created: "2025-10-30T20:52:51.548055877Z"
+    dependencies:
+    - name: common
+      repository: oci://registry-1.docker.io/cloudpirates
+      version: 2.x.x
+    description: An open source, in-memory data structure store used as a database,
+      cache, and message broker.
+    digest: 3284c39c34db3e01960469708f419b100c44ecc18efde54eb222e0a2ca9dad44
+    home: https://www.redis.io
+    icon: https://a.storyblok.com/f/143071/512x512/32c74816d1/redis-logo.svg
+    keywords:
+    - redis
+    - database
+    - cache
+    - in-memory
+    - key-value
+    - nosql
+    maintainers:
+    - email: hello@cloudpirates.io
+      name: CloudPirates GmbH & Co. KG
+      url: https://www.cloudpirates.io
+    name: redis
+    sources:
+    - https://github.com/CloudPirates-io/helm-charts/tree/main/charts/redis
+    - https://github.com/redis/redis
+    type: application
+    urls:
+    - redis-0.12.1.tgz
+    version: 0.12.1
+generated: "2025-10-30T20:52:51.548242767Z"

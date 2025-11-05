@@ -41,8 +41,8 @@ kubeStateMetrics:
 kubeletCadvisorPusher:
   enabled: true
   resources:
-    requests: { cpu: 50m, memory: 32Mi }
-    limits:   { cpu: 200m, memory: 64Mi }
+    requests: { cpu: 50m, memory: 128Mi }
+    limits:   { cpu: 200m, memory: 256Mi }
   filters:
     include: []   # e.g. ['^(container_cpu_|container_memory_)']
     exclude: []   # e.g. ['^container_network_.*']

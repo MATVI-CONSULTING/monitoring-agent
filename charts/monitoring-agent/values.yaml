@@ -28,21 +28,21 @@ agent:
 nodeExporter:
   image: "quay.io/prometheus/node-exporter:v1.9.1"
   resources:
-    requests: { cpu: 50m, memory: 64Mi }
-    limits:   { cpu: 200m, memory: 128Mi }
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 200m, memory: 512Mi }
 
 kubeStateMetrics:
   image: "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.17.0"
   replicas: 1
   resources:
-    requests: { cpu: 50m, memory: 128Mi }
-    limits:   { cpu: 200m, memory: 256Mi }
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 200m, memory: 512Mi }
 
 kubeletCadvisorPusher:
   enabled: true
   resources:
-    requests: { cpu: 50m, memory: 128Mi }
-    limits:   { cpu: 200m, memory: 256Mi }
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: 200m, memory: 512Mi }
   filters:
     include: []   # e.g. ['^(container_cpu_|container_memory_)']
     exclude: []   # e.g. ['^container_network_.*']

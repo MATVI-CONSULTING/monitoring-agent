@@ -1,0 +1,56 @@
+{{- if .Values.databaseMonitoring.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chart.fullname" . }}-database-monitoring
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app: database-monitoring
+  template:
+    metadata:
+      labels:
+        {{- include "chart.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        app: database-monitoring
+    spec:
+      serviceAccountName: {{ include "chart.fullname" . }}-database-monitoring
+      containers:
+        - name: agent
+          image: {{ .Values.agent.image }}
+          env:
+            {{- with .Values.databaseMonitoring.extraEnv }}
+              {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: ENABLE_OVH_DATABASE
+              value: "true"
+            - name: PUSH_INTERVAL
+              value: "{{ .Values.agent.databaseMonitoring.pushInterval }}"
+            - name: INSTANCE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CLUSTER
+              value: "{{ default .Release.Namespace .Values.agent.labels.cluster }}"
+            - name: ENV
+              value: "{{ .Values.agent.labels.env }}"
+            - name: CUSTOMER_NAME
+              value: "{{ default .Release.Namespace .Values.agent.labels.client }}"
+            - name: AGENT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: username
+            - name: AGENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: password
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+{{- end }}

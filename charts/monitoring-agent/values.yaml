@@ -38,6 +38,18 @@ kubeStateMetrics:
     requests: { cpu: 100m, memory: 256Mi }
     limits:   { cpu: 200m, memory: 512Mi }
 
+databaseMonitoring:
+  enabled: false
+  extraEnv: []
+  # - name: OVH_DB_1_URL
+  #   value: "my-value"
+  # - name: OVH_DB_1_NAME
+  #   value: "my-value"
+  # - name: OVH_DB_2_URL
+  #   value: "my-value"
+  # - name: OVH_DB_2_NAME
+  #   value: "my-value"
+
 kubeletCadvisorPusher:
   enabled: true
   resources:

@@ -41,6 +41,7 @@ kubeStateMetrics:
 databaseMonitoring:
   enabled: false
   extraEnv: []
+  pushInterval: 10
   # - name: OVH_DB_1_URL
   #   value: "my-value"
   # - name: OVH_DB_1_NAME

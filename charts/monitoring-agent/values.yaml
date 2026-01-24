@@ -24,6 +24,8 @@ agent:
     pushInterval: 10
   kubeStateMetrics:
     pushInterval: 10
+  databaseMonitoring:
+    pushInterval: 10
 
 nodeExporter:
   image: "quay.io/prometheus/node-exporter:v1.9.1"
@@ -41,7 +43,6 @@ kubeStateMetrics:
 databaseMonitoring:
   enabled: false
   extraEnv: []
-  pushInterval: 10
   # - name: OVH_DB_1_URL
   #   value: "my-value"
   # - name: OVH_DB_1_NAME

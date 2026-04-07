@@ -26,6 +26,8 @@ agent:
     pushInterval: 10
   databaseMonitoring:
     pushInterval: 10
+  rabbitmqMonitoring:
+    pushInterval: 10
 
 nodeExporter:
   image: "quay.io/prometheus/node-exporter:v1.9.1"
@@ -51,6 +53,11 @@ databaseMonitoring:
   #   value: "my-value"
   # - name: OVH_DB_2_NAME
   #   value: "my-value"
+
+rabbitmqMonitoring:
+  enabled: false
+  endpoint: ""
+  # endpoint example: "http://i2s-app-rabbitmq.prod.svc.cluster.local:15692/metrics"
 
 kubeletCadvisorPusher:
   enabled: true

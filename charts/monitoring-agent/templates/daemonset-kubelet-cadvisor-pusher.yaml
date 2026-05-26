@@ -20,6 +20,8 @@ spec:
         app: kubelet-cadvisor-pusher
     spec:
       serviceAccountName: {{ include "chart.fullname" . }}-kubelet-cadvisor-pusher
+      tolerations:
+        - operator: "Exists"
       containers:
         - name: agent
           image: {{ .Values.agent.image }}

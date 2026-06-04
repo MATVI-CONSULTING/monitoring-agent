@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 agent:
-  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.4.5"
+  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.4.6"
   url: "https://push.prod.matvi-consulting.com"   # sans le suffixe /metrics
   basicAuth:
     username: ""
@@ -58,6 +58,8 @@ rabbitmqMonitoring:
   enabled: false
   endpoint: ""
   # endpoint example: "http://i2s-app-rabbitmq.prod.svc.cluster.local:15692/metrics"
+  excludedQueues: ""
+  # excludedQueues example: "data.copy,life.copy"
 
 kubeletCadvisorPusher:
   enabled: true

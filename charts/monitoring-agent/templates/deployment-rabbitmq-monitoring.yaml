@@ -26,6 +26,10 @@ spec:
           env:
             - name: RABBITMQ_ENDPOINT
               value: "{{ .Values.rabbitmqMonitoring.endpoint }}"
+            {{- if .Values.rabbitmqMonitoring.excludedQueues }}
+            - name: RABBITMQ_EXCLUDED_QUEUES
+              value: "{{ .Values.rabbitmqMonitoring.excludedQueues }}"
+            {{- end }}
             - name: PUSH_INTERVAL
               value: "{{ .Values.agent.rabbitmqMonitoring.pushInterval }}"
             - name: INSTANCE

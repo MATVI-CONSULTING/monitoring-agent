@@ -2,6 +2,16 @@ apiVersion: v1
 entries:
   matvi-monitoring-agent:
   - apiVersion: v2
+    appVersion: 1.6.0
+    created: "2026-09-09T15:59:32.242769437Z"
+    description: Matvi Monitoring agent Helm chart for Kubernetes
+    digest: 20f8e5dda89bf705eaf7a9c503c466c40b520edc1217690f3af96634a31fcee8
+    name: matvi-monitoring-agent
+    type: application
+    urls:
+    - matvi-monitoring-agent-0.6.0.tgz
+    version: 0.6.0
+  - apiVersion: v2
     appVersion: 1.4.6
     created: "2026-06-04T09:07:17.035045133Z"
     description: Matvi Monitoring agent Helm chart for Kubernetes
@@ -418,4 +428,4 @@ entries:
     urls:
     - redis-0.12.1.tgz
     version: 0.12.1
-generated: "2026-06-04T09:07:17.035349894Z"
+generated: "2026-09-09T15:59:32.243329912Z"

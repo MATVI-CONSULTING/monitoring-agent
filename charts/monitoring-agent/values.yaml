@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 agent:
-  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.4.6"
+  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.6.0"
   url: "https://push.prod.matvi-consulting.com"   # sans le suffixe /metrics
   basicAuth:
     username: ""
@@ -19,15 +19,17 @@ agent:
     requests: { cpu: 200m, memory: 50Mi }
     limits:   { cpu: 250m, memory: 100Mi }
   nodeExporter:
-    pushInterval: 10
+    pushInterval: 30
   cadvisor:
-    pushInterval: 10
+    pushInterval: 30
   kubeStateMetrics:
-    pushInterval: 10
+    pushInterval: 30
   databaseMonitoring:
-    pushInterval: 10
+    pushInterval: 30
   rabbitmqMonitoring:
-    pushInterval: 10
+    pushInterval: 30
+  httpProbe:
+    pushInterval: 30
 
 nodeExporter:
   image: "quay.io/prometheus/node-exporter:v1.9.1"
@@ -60,6 +62,21 @@ rabbitmqMonitoring:
   # endpoint example: "http://i2s-app-rabbitmq.prod.svc.cluster.local:15692/metrics"
   excludedQueues: ""
   # excludedQueues example: "data.copy,life.copy"
+
+# Sonde HTTP : pod dedie, sans exporter local. Il vise le DOMAINE PUBLIC des
+# sites (pas un Service interne) pour tester aussi le DNS public et le TLS.
+httpProbe:
+  enabled: false
+  interval: 60        # secondes entre deux requetes reelles
+  tlsInterval: 3600   # secondes entre deux lectures du certificat
+  connectTimeout: 5
+  maxTime: 10
+  probes: []
+  # - url: "https://www.mon-domaine.tld"
+  #   name: "site-vitrine"          # sert de label `instance` (defaut: probe-N)
+  #   expectedStatus: "200"         # liste CSV acceptee, ex. "200,302"
+  # - url: "https://api.mon-domaine.tld/health"
+  #   name: "api"
 
 kubeletCadvisorPusher:
   enabled: true

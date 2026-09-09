@@ -34,6 +34,36 @@ helm install my-agent matvi-monitoring-agent/matvi-monitoring-agent -f values.ya
 | `push.interval`           | Intervalle entre deux pushs                               | `30s`                                       |
 | `nodeSelector`            | Contraintes de nœud                                       | `{}`                                        |
 
+### 🌐 Sonde HTTP
+
+Vérifie qu'une URL répond bien le code HTTP attendu et surveille l'expiration de son certificat. Les métriques portent les mêmes noms que celles du blackbox-exporter Prometheus (`probe_success`, `probe_http_status_code`, `probe_duration_seconds`, `probe_ssl_earliest_cert_expiry`), avec `job=http-probe` et `instance=<name de la sonde>`.
+
+La sonde doit viser le **domaine public** du site, pas un Service interne : le trafic sort du cluster, résout le DNS public et négocie le TLS. Une panne DNS ou un certificat expiré sont donc détectés.
+
+```yaml
+httpProbe:
+  enabled: true
+  probes:
+    - url: "https://www.mon-domaine.tld"
+      name: "site-vitrine"        # label `instance` (défaut : probe-N)
+      expectedStatus: "200,302"   # liste CSV, défaut : 200
+    - url: "https://api.mon-domaine.tld/health"
+```
+
+| Paramètre | Description | Défaut |
+| ----------- | ------------- | -------- |
+| `httpProbe.enabled` | Déploie un pod dédié aux sondes | `false` |
+| `httpProbe.probes` | Liste des sondes (`url` obligatoire, `name` et `expectedStatus` optionnels) | `[]` |
+| `httpProbe.interval` | Secondes entre deux requêtes réelles | `60` |
+| `httpProbe.tlsInterval` | Secondes entre deux lectures du certificat | `3600` |
+| `httpProbe.connectTimeout` | Timeout de connexion de la sonde | `5` |
+| `httpProbe.maxTime` | Durée maximale d'une sonde | `10` |
+| `agent.httpProbe.pushInterval` | Intervalle de push des dernières mesures | `30` |
+
+Deux rythmes découplés : la sonde réelle tourne toutes les `httpProbe.interval` secondes, mais la dernière mesure est repoussée à chaque `pushInterval`. C'est nécessaire, la push-gateway supprimant les métriques qu'elle sert : une série poussée moins souvent que l'intervalle de scrape de Prometheus apparaîtrait trouée, et `probe_success == 0` ne se déclencherait jamais.
+
+Le pod tourne en mode `http-probe` (`ENABLE_HTTP_PROBE_ONLY=true`) : il ne scrape aucun exporter local et ne pousse donc pas de `monitoring_agent_up`. Activer `httpProbe.enabled` sans déclarer de sonde fait échouer le rendu du chart, plutôt que de déployer un pod muet.
+
 ### 🔐 Secrets nécessaires
 
 Si votre agent doit pousser les métriques vers une cible sécurisée (API key, token, etc.), vous devez créer un secret Kubernetes avant d’installer le chart.

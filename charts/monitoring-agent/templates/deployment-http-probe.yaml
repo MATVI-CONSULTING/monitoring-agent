@@ -1,0 +1,79 @@
+{{- if .Values.httpProbe.enabled }}
+{{- if not .Values.httpProbe.probes }}
+{{- fail "httpProbe.enabled vaut true mais httpProbe.probes est vide : l'agent refuserait de demarrer. Declarez au moins une sonde." }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chart.fullname" . }}-http-probe
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app: http-probe
+  template:
+    metadata:
+      labels:
+        {{- include "chart.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        app: http-probe
+    spec:
+      serviceAccountName: {{ include "chart.fullname" . }}-http-probe
+      containers:
+        - name: agent
+          image: {{ .Values.agent.image }}
+          env:
+            # Mode dedie : ce pod n'a aucun exporter local a scraper. Sans ce
+            # flag l'agent tomberait en mode standard et pousserait un
+            # monitoring_agent_up 0 sur un job=node-exporter inexistant.
+            - name: ENABLE_HTTP_PROBE_ONLY
+              value: "true"
+            {{- range $i, $probe := .Values.httpProbe.probes }}
+            - name: HTTP_PROBE_{{ add1 $i }}_URL
+              value: "{{ required "httpProbe.probes[].url est obligatoire" $probe.url }}"
+            {{- with $probe.name }}
+            - name: HTTP_PROBE_{{ add1 $i }}_NAME
+              value: "{{ . }}"
+            {{- end }}
+            {{- with $probe.expectedStatus }}
+            - name: HTTP_PROBE_{{ add1 $i }}_EXPECTED_STATUS
+              value: "{{ . }}"
+            {{- end }}
+            {{- end }}
+            - name: HTTP_PROBE_INTERVAL
+              value: "{{ .Values.httpProbe.interval }}"
+            - name: HTTP_PROBE_TLS_INTERVAL
+              value: "{{ .Values.httpProbe.tlsInterval }}"
+            - name: HTTP_PROBE_CONNECT_TIMEOUT
+              value: "{{ .Values.httpProbe.connectTimeout }}"
+            - name: HTTP_PROBE_MAX_TIME
+              value: "{{ .Values.httpProbe.maxTime }}"
+            - name: PUSH_INTERVAL
+              value: "{{ .Values.agent.httpProbe.pushInterval }}"
+            - name: INSTANCE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CLUSTER
+              value: "{{ default .Release.Namespace .Values.agent.labels.cluster }}"
+            - name: ENV
+              value: "{{ .Values.agent.labels.env }}"
+            - name: CUSTOMER_NAME
+              value: "{{ default .Release.Namespace .Values.agent.labels.client }}"
+            - name: AGENT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: username
+            - name: AGENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: password
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+{{- end }}

@@ -32,13 +32,13 @@ agent:
     pushInterval: 30
 
 nodeExporter:
-  image: "quay.io/prometheus/node-exporter:v1.9.1"
+  image: "quay.io/prometheus/node-exporter:latest"
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits:   { cpu: 200m, memory: 512Mi }
 
 kubeStateMetrics:
-  image: "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.17.0"
+  image: "registry.k8s.io/kube-state-metrics/kube-state-metrics:latest"
   replicas: 1
   resources:
     requests: { cpu: 100m, memory: 256Mi }

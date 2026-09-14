@@ -24,7 +24,18 @@ spec:
         - name: agent
           image: {{ .Values.agent.image }}
           env:
+            # Ce pod n'embarque pas de node-exporter. Sans cette ligne,
+            # config.sh retombe sur MODE=standard et l'agent scrape
+            # localhost:9100, echoue, puis pousse
+            # `monitoring_agent_up{job="node-exporter"} 0` a chaque cycle — ce
+            # qui allume InstanceUpStatusDown en critical au nom du pod de
+            # monitoring lui-meme, pour toute la duree de vie du deploiement.
+            - name: ENABLE_STANDARD
+              value: "false"
             - name: RABBITMQ_ENDPOINT
+              # Racine du plugin prometheus, SANS suffixe : l'agent lit cette
+              # URL pour les metriques de noeud et « <url>/per-object » pour
+              # les metriques par file.
               value: "{{ .Values.rabbitmqMonitoring.endpoint }}"
             {{- if .Values.rabbitmqMonitoring.excludedQueues }}
             - name: RABBITMQ_EXCLUDED_QUEUES

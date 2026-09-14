@@ -27,6 +27,12 @@ spec:
             {{- with .Values.databaseMonitoring.extraEnv }}
               {{- toYaml . | nindent 12 }}
             {{- end }}
+            # Ce pod n'embarque pas de node-exporter : voir le commentaire
+            # equivalent dans deployment-rabbitmq-monitoring.yaml. Sans cette
+            # ligne, l'agent pousse un `monitoring_agent_up 0` parasite qui
+            # allume InstanceUpStatusDown en permanence.
+            - name: ENABLE_STANDARD
+              value: "false"
             - name: ENABLE_OVH_DATABASE
               value: "true"
             - name: PUSH_INTERVAL

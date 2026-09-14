@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 agent:
-  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.6.0"
+  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.7.0"
   url: "https://push.prod.matvi-consulting.com"   # sans le suffixe /metrics
   basicAuth:
     username: ""
@@ -58,8 +58,21 @@ databaseMonitoring:
 
 rabbitmqMonitoring:
   enabled: false
+  # Racine du plugin prometheus de RabbitMQ, SANS suffixe. L'agent lit deux
+  # URL : « <endpoint>/per-object » pour les metriques par file, qui seules
+  # portent le label `queue`, et « <endpoint> » pour les alarmes du noeud et
+  # l'etat du cluster, que per-object n'expose pas.
+  #
+  # Pointer directement /metrics/per-object ferait disparaitre quatre alertes
+  # (alarmes memoire, disque, file descriptors, peers injoignables) sans le
+  # moindre signal.
   endpoint: ""
   # endpoint example: "http://i2s-app-rabbitmq.prod.svc.cluster.local:15692/metrics"
+  #
+  # Files a ne jamais faire alerter : typiquement des tampons circulaires
+  # bornes par x-max-length, sans consumer par construction, donc pleins en
+  # permanence. L'exclusion agit sur le label `queue` ; si elle ne retire
+  # aucune ligne, l'agent le signale dans ses logs.
   excludedQueues: ""
   # excludedQueues example: "data.copy,life.copy"
 

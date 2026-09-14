@@ -12,6 +12,33 @@ helm repo update
 helm install my-agent matvi-monitoring-agent/matvi-monitoring-agent
 ```
 
+### 🏗️ Déploiement via Terraform / CDKTF
+
+Si vous déployez le chart via la ressource `helm_release`, utilisez les options suivantes :
+
+```hcl
+resource "helm_release" "matvi_monitoring_agent" {
+  name       = "matvi-monitoring-agent"
+  chart      = "matvi-monitoring-agent"
+  repository = "https://charts.matvi-consulting.com"
+  namespace  = "monitoring"
+  version    = "0.6.2"
+
+  wait            = true
+  timeout         = 600
+  atomic          = true
+  cleanup_on_fail = true
+}
+```
+
+| Option            | Pourquoi                                                                                                                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `atomic`          | **Indispensable.** Sans cette option, un install qui échoue laisse une release en état `failed` dans le cluster alors que Terraform ne l'a pas enregistrée dans son state. Le run suivant retente un install et échoue définitivement sur `cannot re-use a name that is still in use`, ce qui impose un `helm uninstall` manuel. Avec `atomic`, Helm nettoie tout seul et la pipeline reste rejouable. |
+| `cleanup_on_fail` | Supprime les ressources nouvellement créées lors d'un upgrade raté, au lieu de les laisser orphelines.                                                                                                                                |
+| `timeout`         | Le défaut de 300s est souvent trop court : le chart déploie des DaemonSets (`node-exporter`, `kubelet-cadvisor-pusher`), donc autant de pods à passer `Ready` qu'il y a de nœuds. Comptez large sur les gros clusters, sinon l'upgrade sort en `context deadline exceeded`. |
+
+> `atomic` implique déjà `wait` ; le garder explicite ne coûte rien et rend l'intention lisible.
+
 ## ⚙️ Configuration
 
 Le chart expose plusieurs valeurs personnalisables via `values.yaml`. Vous pouvez les surcharger lors de l’installation avec `--set` ou en fournissant un fichier personnalisé.

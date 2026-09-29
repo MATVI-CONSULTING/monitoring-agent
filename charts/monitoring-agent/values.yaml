@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 agent:
-  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.7.0"
+  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.9.0"
   url: "https://push.prod.matvi-consulting.com"   # sans le suffixe /metrics
   basicAuth:
     username: ""
@@ -29,6 +29,8 @@ agent:
   rabbitmqMonitoring:
     pushInterval: 30
   httpProbe:
+    pushInterval: 30
+  dnsProbe:
     pushInterval: 30
 
 nodeExporter:
@@ -103,6 +105,19 @@ httpProbe:
   #   expectedStatus: "200"         # liste CSV acceptee, ex. "200,302"
   # - url: "https://api.mon-domaine.tld/health"
   #   name: "api"
+
+# Sonde DNS des hosts d'Ingress, active par defaut : chaque host lu dans
+# kube_ingress_path (KSM) est resolu sur des resolveurs publics. Pas de RBAC.
+dnsProbe:
+  enabled: true
+  interval: 60                  # secondes entre deux resolutions reelles
+  resolvers: "1.1.1.1 8.8.8.8"  # essayes dans l'ordre, le premier qui repond suffit
+  timeout: 2                    # secondes par requete dig
+  excludeHosts: ""              # regex etendue, ex. "^preview-.*\\.example\\.com$"
+
+# Scrape d'external-dns par le pod dns-probe.
+externalDns:
+  scrapeUrl: "auto"             # auto : service external-dns trouve dans KSM ; "" : desactive ; sinon URL
 
 kubeletCadvisorPusher:
   enabled: true

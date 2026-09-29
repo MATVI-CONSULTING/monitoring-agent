@@ -146,3 +146,38 @@ for doc in yaml.safe_load_all(sys.stdin):
 sys.exit('deploiement dns-probe absent')
 "
 }
+
+# Les DaemonSets n'ont qu'un pod par node, cloue a ce node : ni l'autoscaler ni
+# le scheduler ne peuvent le placer ailleurs. Sans priorite, un node rempli par
+# des workloads ordinaires le laisse Pending pour toujours, et tout helm upgrade
+# --wait expire. Verifie en production chez charlie-solutions le 29/09/2026 :
+# node-exporter Pending sur un node dev plein, upgrades 0.8.0 et 0.9.0 en echec.
+
+# Affiche le priorityClassName d'un DaemonSet (vide s'il est absent).
+priorite_du_daemonset() {
+  local daemonset="$1"
+  python3 -c "
+import sys, yaml
+for doc in yaml.safe_load_all(sys.stdin):
+    if not doc or doc.get('kind') != 'DaemonSet': continue
+    if not doc['metadata']['name'].endswith('$daemonset'): continue
+    print(doc['spec']['template']['spec'].get('priorityClassName', '')); sys.exit(0)
+sys.exit('daemonset $daemonset absent')
+"
+}
+
+@test "les daemonsets sont system-node-critical par defaut" {
+  rendu=$(helm template essai "$CHART")
+  for ds in node-exporter kubelet-cadvisor-pusher; do
+    valeur=$(printf '%s' "$rendu" | priorite_du_daemonset "$ds")
+    [ "$valeur" = "system-node-critical" ] || { echo "$ds : priorityClassName vaut '$valeur'"; false; }
+  done
+}
+
+@test "la priorite d'un daemonset se surcharge et se desactive" {
+  rendu=$(helm template essai "$CHART" \
+    --set nodeExporter.priorityClassName=resource-guaranteed \
+    --set kubeletCadvisorPusher.priorityClassName=)
+  [ "$(printf '%s' "$rendu" | priorite_du_daemonset node-exporter)" = "resource-guaranteed" ]
+  [ "$(printf '%s' "$rendu" | priorite_du_daemonset kubelet-cadvisor-pusher)" = "" ]
+}

@@ -5,7 +5,7 @@ entries:
     appVersion: 1.7.0
     created: "2026-09-29T09:02:25.200188896Z"
     description: Matvi Monitoring agent Helm chart for Kubernetes
-    digest: d1713d87b99d5baca36d04171de47aca547d6412e6af378df5606be3c23d258c
+    digest: 0970b7bb1754290c5360215d0ee271ddf4d473641850fb962c9aaf9e697d075a
     name: matvi-monitoring-agent
     type: application
     urls:

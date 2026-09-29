@@ -1,0 +1,72 @@
+{{- if .Values.dnsProbe.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chart.fullname" . }}-dns-probe
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app: dns-probe
+  template:
+    metadata:
+      labels:
+        {{- include "chart.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        app: dns-probe
+    spec:
+      serviceAccountName: {{ include "chart.fullname" . }}-dns-probe
+      automountServiceAccountToken: false
+      containers:
+        - name: agent
+          image: {{ .Values.agent.image }}
+          env:
+            # Mode dedie : ce pod n'a aucun exporter local a scraper. Sans ce
+            # flag l'agent tomberait en mode standard et pousserait un
+            # monitoring_agent_up 0 sur un job=node-exporter inexistant.
+            - name: ENABLE_DNS_PROBE_ONLY
+              value: "true"
+            # Liste des hosts : kube_ingress_path du KSM de cette release.
+            - name: DNS_PROBE_KSM_URL
+              value: "http://{{ include "chart.fullname" . }}-kube-state-metrics.{{ .Release.Namespace }}.svc:8080/metrics"
+            - name: DNS_PROBE_INTERVAL
+              value: "{{ .Values.dnsProbe.interval }}"
+            - name: DNS_PROBE_RESOLVERS
+              value: "{{ .Values.dnsProbe.resolvers }}"
+            - name: DNS_PROBE_TIMEOUT
+              value: "{{ .Values.dnsProbe.timeout }}"
+            - name: DNS_PROBE_EXCLUDE_HOSTS
+              value: {{ .Values.dnsProbe.excludeHosts | quote }}
+            # Toujours posee, meme vide : l'agent lit une variable ABSENTE
+            # comme « auto » et une variable VIDE comme « desactive ».
+            - name: EXTERNAL_DNS_SCRAPE_URL
+              value: {{ .Values.externalDns.scrapeUrl | quote }}
+            - name: PUSH_INTERVAL
+              value: "{{ .Values.agent.dnsProbe.pushInterval }}"
+            - name: INSTANCE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CLUSTER
+              value: "{{ default .Release.Namespace .Values.agent.labels.cluster }}"
+            - name: ENV
+              value: "{{ .Values.agent.labels.env }}"
+            - name: CUSTOMER_NAME
+              value: "{{ default .Release.Namespace .Values.agent.labels.client }}"
+            - name: AGENT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: username
+            - name: AGENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: password
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+{{- end }}

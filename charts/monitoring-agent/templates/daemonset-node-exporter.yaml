@@ -18,6 +18,9 @@ spec:
         {{- end }}
         app: node-exporter
     spec:
+      {{- with .Values.nodeExporter.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       hostPID: true
       hostNetwork: true
       tolerations:

@@ -91,3 +91,58 @@ for doc in yaml.safe_load_all(sys.stdin):
     esac
   done
 }
+
+# ---------------------------------------------------------------------------
+# Sonde DNS : deployee par defaut, sur tous les clusters.
+# ---------------------------------------------------------------------------
+
+@test "la sonde DNS est deployee par defaut, en mode dedie" {
+  rendu=$(helm template essai "$CHART")
+  valeur=$(printf '%s' "$rendu" | env_du_deploiement dns-probe ENABLE_DNS_PROBE_ONLY)
+  [ "$valeur" = "true" ] || { echo "ENABLE_DNS_PROBE_ONLY vaut '$valeur'"; false; }
+}
+
+@test "la sonde DNS lit ses hosts dans le kube-state-metrics du chart" {
+  # Pas de RBAC : la liste vient de kube_ingress_path, via le Service KSM de
+  # la meme release.
+  rendu=$(helm template essai "$CHART" --namespace monitoring)
+  valeur=$(printf '%s' "$rendu" | env_du_deploiement dns-probe DNS_PROBE_KSM_URL)
+  service=$(printf '%s' "$rendu" | python3 -c "
+import sys, yaml
+for doc in yaml.safe_load_all(sys.stdin):
+    if doc and doc.get('kind') == 'Service' and doc['metadata']['name'].endswith('kube-state-metrics'):
+        print(doc['metadata']['name'])
+")
+  [ "$valeur" = "http://${service}.monitoring.svc:8080/metrics" ] || { echo "DNS_PROBE_KSM_URL vaut '$valeur'"; false; }
+}
+
+@test "la sonde DNS se desactive" {
+  rendu=$(helm template essai "$CHART" --set dnsProbe.enabled=false)
+  ! printf '%s' "$rendu" | grep -q 'name: essai-matvi-monitoring-agent-dns-probe$'
+  ! printf '%s' "$rendu" | grep -q 'ENABLE_DNS_PROBE_ONLY'
+}
+
+@test "la sonde DNS transmet exclusions, resolveurs et external-dns" {
+  rendu=$(helm template essai "$CHART" \
+    --set 'dnsProbe.excludeHosts=^preview-.*' \
+    --set 'dnsProbe.resolvers=9.9.9.9 1.1.1.1')
+  [ "$(printf '%s' "$rendu" | env_du_deploiement dns-probe DNS_PROBE_EXCLUDE_HOSTS)" = "^preview-.*" ]
+  [ "$(printf '%s' "$rendu" | env_du_deploiement dns-probe DNS_PROBE_RESOLVERS)" = "9.9.9.9 1.1.1.1" ]
+  [ "$(printf '%s' "$rendu" | env_du_deploiement dns-probe EXTERNAL_DNS_SCRAPE_URL)" = "auto" ]
+}
+
+@test "external-dns desactive reste une chaine vide, pas auto" {
+  # L'agent lit ${EXTERNAL_DNS_SCRAPE_URL-auto} : une variable absente vaut
+  # auto, une variable vide desactive. Le chart doit donc poser la variable.
+  rendu=$(helm template essai "$CHART" --set externalDns.scrapeUrl=)
+  printf '%s' "$rendu" | python3 -c "
+import sys, yaml
+for doc in yaml.safe_load_all(sys.stdin):
+    if not doc or doc.get('kind') != 'Deployment' or not doc['metadata']['name'].endswith('dns-probe'): continue
+    env = {e['name']: e.get('value') for e in doc['spec']['template']['spec']['containers'][0]['env']}
+    assert 'EXTERNAL_DNS_SCRAPE_URL' in env, 'variable absente'
+    assert env['EXTERNAL_DNS_SCRAPE_URL'] == '', repr(env['EXTERNAL_DNS_SCRAPE_URL'])
+    sys.exit(0)
+sys.exit('deploiement dns-probe absent')
+"
+}

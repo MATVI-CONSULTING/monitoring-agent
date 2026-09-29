@@ -91,6 +91,26 @@ Deux rythmes découplés : la sonde réelle tourne toutes les `httpProbe.interva
 
 Le pod tourne en mode `http-probe` (`ENABLE_HTTP_PROBE_ONLY=true`) : il ne scrape aucun exporter local et ne pousse donc pas de `monitoring_agent_up`. Activer `httpProbe.enabled` sans déclarer de sonde fait échouer le rendu du chart, plutôt que de déployer un pod muet.
 
+### 🧭 Sonde DNS (active par défaut)
+
+Vérifie que chaque host déclaré dans un Ingress résout en DNS public, et remonte l'état d'external-dns. Le pod `dns-probe` est déployé par défaut sur tous les clusters.
+
+- **Liste des hosts** : lue dans `kube_ingress_path`, via le kube-state-metrics du chart. Aucun RBAC supplémentaire. Wildcards et hosts vides ignorés.
+- **Résolution** : résolveurs publics (`1.1.1.1` puis `8.8.8.8` en repli), pour voir ce que voient les visiteurs et non le cache de CoreDNS.
+- **external-dns** : en `auto`, le service `external-dns` est cherché dans KSM et scrapé sur `:7979`. Un cluster sans external-dns ne pousse rien.
+
+| Valeur | Description | Défaut |
+|--------|-------------|--------|
+| `dnsProbe.enabled` | Déploie le pod de sonde DNS | `true` |
+| `dnsProbe.interval` | Secondes entre deux résolutions réelles | `60` |
+| `dnsProbe.resolvers` | Résolveurs, essayés dans l'ordre | `1.1.1.1 8.8.8.8` |
+| `dnsProbe.timeout` | Timeout d'une requête, en secondes | `2` |
+| `dnsProbe.excludeHosts` | Regex étendue des hosts à ne pas sonder | `""` |
+| `externalDns.scrapeUrl` | `auto`, `""` (désactivé) ou URL explicite | `auto` |
+| `agent.dnsProbe.pushInterval` | Intervalle de push des dernières mesures | `30` |
+
+Métriques : `dns_probe_success{namespace,ingress,host,rcode}`, `dns_probe_answer{namespace,ingress,host,ip}` (`job=dns-probe`), et `external_dns_controller_*`, `external_dns_registry_*`, `external_dns_source_*`, `external_dns_scrape_up` (`job=external-dns`). La comparaison avec l'IP du load balancer est faite côté règles Prometheus, par jointure avec `kube_service_status_load_balancer_ingress`.
+
 ### 🔐 Secrets nécessaires
 
 Si votre agent doit pousser les métriques vers une cible sécurisée (API key, token, etc.), vous devez créer un secret Kubernetes avant d’installer le chart.

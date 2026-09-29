@@ -70,3 +70,24 @@ for doc in yaml.safe_load_all(sys.stdin):
   image=$(grep '^  image:' "$CHART/values.yaml" | head -1 | tr -d '"' | sed 's/.*://')
   [ "$app" = "$image" ] || { echo "appVersion=$app, image=$image"; false; }
 }
+
+@test "kube-state-metrics expose les labels de nodepool des trois clouds" {
+  # Sans --metric-labels-allowlist, kube_node_labels ne porte aucun label :
+  # le dashboard k8s-capacity ne pourrait ventiler ni par nodepool ni par type
+  # d'instance. OVH (nodepool), EKS/Karpenter et AKS (agentpool) doivent y etre.
+  rendu=$(helm template essai "$CHART")
+  args=$(printf '%s' "$rendu" | python3 -c "
+import sys, yaml
+for doc in yaml.safe_load_all(sys.stdin):
+    if not doc or doc.get('kind') != 'Deployment': continue
+    if not doc['metadata']['name'].endswith('kube-state-metrics'): continue
+    print(' '.join(doc['spec']['template']['spec']['containers'][0].get('args', [])))
+")
+  for label in nodepool node.kubernetes.io/instance-type karpenter.sh/nodepool \
+               eks.amazonaws.com/nodegroup kubernetes.azure.com/agentpool; do
+    case "$args" in
+      *--metric-labels-allowlist=nodes=\[*"$label"*\]*) ;;
+      *) echo "label $label absent de : $args"; false ;;
+    esac
+  done
+}

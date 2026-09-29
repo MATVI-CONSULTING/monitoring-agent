@@ -35,6 +35,9 @@ agent:
 
 nodeExporter:
   image: "quay.io/prometheus/node-exporter:v1.12.1"
+  # Un pod de DaemonSet est cloue a son node : sans priorite, un node plein le
+  # laisse Pending et tout `helm upgrade --wait` expire. "" pour desactiver.
+  priorityClassName: "system-node-critical"
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits:   { cpu: 200m, memory: 512Mi }
@@ -121,6 +124,7 @@ externalDns:
 
 kubeletCadvisorPusher:
   enabled: true
+  priorityClassName: "system-node-critical"   # cf. nodeExporter.priorityClassName
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits:   { cpu: 200m, memory: 512Mi }

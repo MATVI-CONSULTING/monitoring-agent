@@ -19,6 +19,9 @@ spec:
         {{- end }}
         app: kubelet-cadvisor-pusher
     spec:
+      {{- with .Values.kubeletCadvisorPusher.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       serviceAccountName: {{ include "chart.fullname" . }}-kubelet-cadvisor-pusher
       tolerations:
         - operator: "Exists"

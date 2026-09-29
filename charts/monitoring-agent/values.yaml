@@ -40,6 +40,19 @@ nodeExporter:
 kubeStateMetrics:
   image: "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0"
   replicas: 1
+  # Labels de node recopies dans kube_node_labels (vide par defaut cote KSM).
+  # Le dashboard k8s-capacity en tire nodepool et type d'instance, quel que
+  # soit le cloud : OVH, EKS (nodegroup ou Karpenter), AKS.
+  nodeLabelsAllowlist:
+    - nodepool
+    - node.kubernetes.io/instance-type
+    - topology.kubernetes.io/zone
+    - karpenter.sh/nodepool
+    - karpenter.sh/capacity-type
+    - eks.amazonaws.com/nodegroup
+    - eks.amazonaws.com/capacityType
+    - agentpool
+    - kubernetes.azure.com/agentpool
   resources:
     requests: { cpu: 100m, memory: 256Mi }
     limits:   { cpu: 200m, memory: 512Mi }

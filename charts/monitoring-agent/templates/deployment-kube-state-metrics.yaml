@@ -22,6 +22,10 @@ spec:
       containers:
         - name: kube-state-metrics
           image: {{ .Values.kubeStateMetrics.image }}
+          {{- with .Values.kubeStateMetrics.nodeLabelsAllowlist }}
+          args:
+            - --metric-labels-allowlist=nodes=[{{ join "," . }}]
+          {{- end }}
           ports:
             - name: http-metrics
               containerPort: 8080

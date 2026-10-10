@@ -15,3 +15,9 @@ updates:
     directory: /charts/monitoring-agent
     schedule:
       interval: weekly
+    ignore:
+      # Dependabot ne sait pas lister les tags sur quay.io (DockerRegistry2::
+      # NotFound) et fait echouer tout le job. On reste sur quay.io : Docker Hub
+      # (prom/node-exporter) imposerait ses limites de pull anonyme a un
+      # DaemonSet tirant l'image sur chaque node. Bump manuel.
+      - dependency-name: "quay.io/prometheus/node-exporter"

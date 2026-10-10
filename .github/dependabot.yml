@@ -1,0 +1,17 @@
+# Mises a jour de versions. Les correctifs de securite (CVE) sont actives
+# separement dans les reglages du depot (Dependabot security updates).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns: ["*"]
+  # Chart.yaml (dependances) et images de values.yaml. Penser a aligner
+  # appVersion quand l'image de l'agent est bumpee (test chart.bats).
+  - package-ecosystem: helm
+    directory: /charts/monitoring-agent
+    schedule:
+      interval: weekly

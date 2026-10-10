@@ -16,8 +16,9 @@ updates:
     schedule:
       interval: weekly
     ignore:
-      # Dependabot ne sait pas lister les tags sur quay.io (DockerRegistry2::
-      # NotFound) et fait echouer tout le job. On reste sur quay.io : Docker Hub
-      # (prom/node-exporter) imposerait ses limites de pull anonyme a un
-      # DaemonSet tirant l'image sur chaque node. Bump manuel.
+      # Dependabot ne sait lister les tags ni sur quay.io ni sur registry.k8s.io
+      # (DockerRegistry2::NotFound) et fait alors echouer tout le job. On garde
+      # ces registres (pas de limite de pull anonyme, contrairement a Docker Hub,
+      # pour des images tirees sur chaque node) : bump manuel.
       - dependency-name: "quay.io/prometheus/node-exporter"
+      - dependency-name: "registry.k8s.io/kube-state-metrics/kube-state-metrics"

@@ -1,0 +1,112 @@
+name: Release
+
+# Seule voie de release : lancement manuel depuis l'onglet Actions.
+# Cree le tag vX.Y.Z sur le commit donne, la release "Release X.Y.Z" (chart en asset),
+# puis publie le chart sur gh-pages (charts.matvi-consulting.com).
+# Remplace chart-releaser, qui creait une seconde release matvi-monitoring-agent-X.Y.Z.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version semver sans le v (ex: 0.10.0), doit egaler version de Chart.yaml"
+        required: true
+        type: string
+      commit:
+        description: "SHA du commit a releaser (doit etre sur helm-chart)"
+        required: true
+        type: string
+      notes:
+        description: "Notes de release (vide = notes generees automatiquement)"
+        required: false
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CHART: charts/monitoring-agent
+  VERSION: ${{ inputs.version }}
+  COMMIT: ${{ inputs.commit }}
+  TAG: v${{ inputs.version }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.commit }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.16.2
+
+      - name: Valider version, tag, commit et Chart.yaml
+        run: |
+          set -euo pipefail
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version invalide '$VERSION' (attendu X.Y.Z, sans v)"; exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Le tag $TAG existe deja"; exit 1
+          fi
+          SHA=$(git rev-parse --verify "$COMMIT^{commit}")
+          if ! git merge-base --is-ancestor "$SHA" origin/helm-chart; then
+            echo "::error::Le commit $SHA n'est pas sur helm-chart"; exit 1
+          fi
+          CHART_VERSION=$(helm show chart "$CHART" | awk '/^version:/ {gsub(/["\047]/, "", $2); print $2}')
+          if [[ "$CHART_VERSION" != "$VERSION" ]]; then
+            echo "::error::Chart.yaml version=$CHART_VERSION mais version demandee=$VERSION"; exit 1
+          fi
+          echo "SHA=$SHA" >> "$GITHUB_ENV"
+
+      - name: Package du chart
+        run: |
+          set -euo pipefail
+          helm lint "$CHART"
+          mkdir -p "$RUNNER_TEMP/pkg"
+          helm package "$CHART" -d "$RUNNER_TEMP/pkg"
+          PKG=$(ls "$RUNNER_TEMP"/pkg/*.tgz)
+          echo "PKG=$PKG" >> "$GITHUB_ENV"
+
+      - name: Creer le tag et la release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ inputs.notes }}
+        run: |
+          set -euo pipefail
+          git tag -a "$TAG" "$SHA" -m "Release $VERSION"
+          git push origin "refs/tags/$TAG"
+          if [[ -n "$NOTES" ]]; then
+            gh release create "$TAG" "$PKG" --verify-tag --title "Release $VERSION" --notes "$NOTES"
+          else
+            gh release create "$TAG" "$PKG" --verify-tag --title "Release $VERSION" --generate-notes
+          fi
+
+      # Meme resultat que l'ancien release.sh + chart-releaser (packages_with_index) :
+      # merge du commit dans gh-pages, .tgz a la racine, index.yaml fusionne en URLs relatives.
+      - name: Publier le chart sur gh-pages
+        run: |
+          set -euo pipefail
+          git checkout -B gh-pages origin/gh-pages
+          git merge --no-edit "$SHA" -m "Merge helm-chart for release $VERSION"
+          cp "$PKG" .
+          mkdir -p "$RUNNER_TEMP/idx"
+          cp "$PKG" "$RUNNER_TEMP/idx/"
+          helm repo index "$RUNNER_TEMP/idx" --merge index.yaml
+          cp "$RUNNER_TEMP/idx/index.yaml" index.yaml
+          git add index.yaml "$(basename "$PKG")"
+          git commit -m "Publish matvi-monitoring-agent $VERSION"
+          git push origin gh-pages

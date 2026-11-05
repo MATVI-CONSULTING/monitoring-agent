@@ -1,142 +1,145 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Lance le workflow GitHub Actions `release.yml` (workflow_dispatch) sur le
+# dernier commit poussé de la branche par defaut.
+# Le workflow crée lui-même le tag vX.Y.Z et la release : ce script ne crée
+# ni tag ni release, il demande seulement la version.
+#
+# Usage : ./release.sh
+set -euo pipefail
 
-set -e
-
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Function to print colored messages
-print_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
+warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
+die()   { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
+
+confirm() {
+  local reply
+  read -r -p "$1 (y/N) " reply
+  [[ "$reply" =~ ^[Yy]$ ]]
 }
 
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
+# --- Prérequis ---
 
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+command -v git >/dev/null || die "git introuvable"
+command -v gh >/dev/null || die "GitHub CLI (gh) introuvable : brew install gh"
+gh auth status >/dev/null 2>&1 || die "gh non authentifié : gh auth login"
+git rev-parse --git-dir >/dev/null 2>&1 || die "Pas dans un dépôt git"
+cd "$(git rev-parse --show-toplevel)"
+[[ -f .github/workflows/release.yml ]] || die "Pas de .github/workflows/release.yml dans ce dépôt"
 
-# Check if gh CLI is installed
-if ! command -v gh &> /dev/null; then
-    print_error "GitHub CLI (gh) is not installed"
-    print_info "Install it with: brew install gh"
-    exit 1
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+
+# --- Dernier commit poussé ---
+
+info "Récupération de origin/$BRANCH et des tags..."
+git fetch --quiet --tags origin "$BRANCH"
+COMMIT=$(git rev-parse "origin/$BRANCH")
+
+if [[ "$(git rev-parse HEAD)" != "$COMMIT" ]]; then
+  warn "HEAD local ($(git rev-parse --short HEAD)) diffère de origin/$BRANCH ($(git rev-parse --short "$COMMIT"))."
+  warn "C'est origin/$BRANCH qui sera releasé (les commits non poussés sont ignorés)."
+fi
+if [[ -n "$(git status --porcelain)" ]]; then
+  warn "Modifications locales non commitées : elles ne font pas partie de la release."
 fi
 
-# Check if we're authenticated
-if ! gh auth status &> /dev/null; then
-    print_error "Not authenticated with GitHub"
-    print_info "Run: gh auth login"
-    exit 1
+# --- Version ---
+
+# Dernière release GitHub (« Latest »), sinon dernier tag vX.Y.Z de la branche.
+LAST_TAG=$(gh release view --repo "$REPO" --json tagName -q .tagName 2>/dev/null || true)
+if [[ ! "$LAST_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  LAST_TAG=$(git tag --list 'v[0-9]*' --merged "$COMMIT" --sort=-v:refname | head -n 1)
 fi
 
-# Check if we're in a git repository
-if ! git rev-parse --git-dir > /dev/null 2>&1; then
-    print_error "Not in a git repository"
-    exit 1
+# Chart Helm : la version doit égaler `version` du Chart.yaml au commit releasé.
+CHART_FILE=""
+CHART_VERSION=""
+CHARTS=$(git ls-tree -r --name-only "$COMMIT" | grep -E '(^|/)Chart\.yaml$' || true)
+if [[ -n "$CHARTS" ]]; then
+  if [[ $(printf '%s\n' "$CHARTS" | wc -l) -eq 1 ]]; then
+    CHART_FILE=$CHARTS
+    CHART_VERSION=$(git show "$COMMIT:$CHART_FILE" | sed -n 's/^version:[[:space:]]*//p' | tr -d "\"' ")
+  else
+    warn "Plusieurs Chart.yaml : vérification de version ignorée."
+  fi
 fi
 
-# Check for uncommitted changes
-if ! git diff-index --quiet HEAD --; then
-    print_warning "You have uncommitted changes"
-    read -p "Do you want to continue? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
+SUGGEST=""
+if [[ -n "$CHART_VERSION" ]]; then
+  SUGGEST=$CHART_VERSION
+elif [[ -n "$LAST_TAG" ]]; then
+  IFS=. read -r MAJ MIN PAT <<<"${LAST_TAG#v}"
+  SUGGEST="$MAJ.$MIN.$((PAT + 1))"
 fi
 
-# Get current branch
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-print_info "Current branch: $CURRENT_BRANCH"
-
-# Ask for version number
 echo
-read -p "Enter version number (e.g., 1.0.0): " VERSION
+info "Dépôt          : $REPO"
+info "Branche        : $BRANCH"
+info "Commit         : $(git log -1 --format='%h %s' "$COMMIT")"
+info "Dernière release : ${LAST_TAG:-aucune}"
+[[ -n "$CHART_VERSION" ]] && info "Chart.yaml     : $CHART_FILE (version $CHART_VERSION)"
+echo
 
-# Validate version format
-if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    print_error "Invalid version format. Please use semantic versioning (e.g., 1.0.0)"
-    exit 1
-fi
+read -r -p "Version à releaser, X.Y.Z sans v${SUGGEST:+ [$SUGGEST]} : " VERSION
+VERSION=${VERSION:-$SUGGEST}
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Version invalide '$VERSION' (attendu X.Y.Z, sans v)"
 
 TAG="v$VERSION"
-
-# Check if tag already exists
-if git rev-parse "$TAG" >/dev/null 2>&1; then
-    print_error "Tag $TAG already exists"
-    exit 1
+if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+  if [[ "$VERSION" == "$CHART_VERSION" ]]; then
+    die "Le tag $TAG existe déjà : passer version de $CHART_FILE à une nouvelle version, pousser, puis relancer"
+  fi
+  die "Le tag $TAG existe déjà"
+fi
+if [[ -n "$CHART_VERSION" && "$CHART_VERSION" != "$VERSION" ]]; then
+  die "$CHART_FILE est en $CHART_VERSION sur origin/$BRANCH : passer version à $VERSION, pousser, puis relancer"
 fi
 
-# Ask for release notes
-echo
-print_info "Enter release notes (press Ctrl+D when done):"
-RELEASE_NOTES=$(cat)
+read -r -p "Notes de release (une ligne, vide = notes par défaut du workflow) : " NOTES
 
-# Confirm release creation
-echo
-print_info "Summary:"
-echo "  - Version: $VERSION"
-echo "  - Tag: $TAG"
-echo "  - Branch: $CURRENT_BRANCH"
-echo "  - Release notes: "
-echo "$RELEASE_NOTES" | sed 's/^/    /'
-echo
+# --- Confirmation ---
 
-read -p "Create release? (y/N) " -n 1 -r
 echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    print_info "Release cancelled"
-    exit 0
+info "Résumé :"
+echo "  - Dépôt   : $REPO"
+echo "  - Version : $VERSION (tag $TAG)"
+echo "  - Commit  : $COMMIT"
+echo "  - Notes   : ${NOTES:-<par défaut>}"
+echo
+confirm "Lancer le workflow release.yml ?" || { info "Release annulée"; exit 0; }
+
+# --- Lancement ---
+
+ARGS=(-f "version=$VERSION" -f "commit=$COMMIT")
+[[ -n "$NOTES" ]] && ARGS+=(-f "notes=$NOTES")
+
+# Marge de 30 s pour un éventuel décalage d'horloge (date BSD sur macOS, GNU sinon).
+SINCE=$(date -u -v-30S +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '30 seconds ago' +%Y-%m-%dT%H:%M:%SZ)
+gh workflow run release.yml --repo "$REPO" --ref "$BRANCH" "${ARGS[@]}"
+info "Workflow lancé."
+
+# Le run met quelques secondes à apparaître : on prend le premier créé après SINCE.
+RUN_ID=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  sleep 3
+  RUN_ID=$(gh run list --repo "$REPO" --workflow=release.yml --event workflow_dispatch --limit 5 \
+    --json databaseId,createdAt \
+    --jq "map(select(.createdAt >= \"$SINCE\")) | last | .databaseId // empty")
+  [[ -n "$RUN_ID" ]] && break
+done
+
+if [[ -z "$RUN_ID" ]]; then
+  warn "Run introuvable pour l'instant : gh run list --repo $REPO --workflow=release.yml"
+  exit 0
 fi
 
-# Pull latest changes
-print_info "Pulling latest changes..."
-git pull origin "$CURRENT_BRANCH"
-
-# Create and push tag
-print_info "Creating tag $TAG..."
-git tag -a "$TAG" -m "Release $VERSION"
-
-print_info "Pushing tag to GitHub..."
-git push origin "$TAG"
-
-# Create GitHub release
-print_info "Creating GitHub release..."
-echo "$RELEASE_NOTES" | gh release create "$TAG" \
-    --title "Release $VERSION" \
-    --notes-file -
-
-print_info "✓ Release $VERSION created successfully!"
-print_info "The GitHub Action will now build and publish the Docker image."
-
-# Merge helm-chart into gh-pages
-print_info "Merging helm-chart branch into gh-pages..."
-ORIGINAL_BRANCH="$CURRENT_BRANCH"
-
-# Fetch latest changes
-git fetch origin
-
-# Checkout gh-pages
-git checkout gh-pages
-git pull origin gh-pages
-
-# Merge helm-chart into gh-pages
-git merge origin/helm-chart -m "Merge helm-chart for release $VERSION"
-
-# Push to gh-pages
-git push origin gh-pages
-
-# Return to original branch
-git checkout "$ORIGINAL_BRANCH"
-
-print_info "✓ Successfully merged helm-chart into gh-pages"
-
-print_info ""
-print_info "View release: $(gh release view "$TAG" --web 2>&1 | grep -o 'https://.*')"
-print_info "Image will be available at: ghcr.io/$(gh repo view --json nameWithOwner -q .nameWithOwner | tr '[:upper:]' '[:lower:]'):$VERSION"
+info "Run : https://github.com/$REPO/actions/runs/$RUN_ID"
+if confirm "Suivre l'exécution ?"; then
+  gh run watch "$RUN_ID" --repo "$REPO" --exit-status
+  info "Release $VERSION terminée : https://github.com/$REPO/releases/tag/$TAG"
+fi

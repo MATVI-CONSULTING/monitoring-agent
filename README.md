@@ -148,3 +148,12 @@ Pour supprimer le chart :
 ```bash
 helm uninstall my-agent
 ```
+
+## 🏷️ Publier une version
+
+1. Monter `version` dans `charts/monitoring-agent/Chart.yaml` et merger sur `helm-chart`.
+2. Lancer `./release.sh` : il demande la version et déclenche le workflow `Release` sur le dernier commit de `helm-chart`
+   (équivalent : `gh workflow run release.yml -f version=X.Y.Z -f commit=<sha>`).
+3. Le workflow vérifie la version par rapport à `Chart.yaml`, crée le tag `vX.Y.Z` et la release GitHub, puis publie le chart sur `gh-pages`.
+
+Ne pas créer de tag ni de release à la main.

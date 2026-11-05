@@ -1,0 +1,24 @@
+# Mises a jour de versions. Les correctifs de securite (CVE) sont actives
+# separement dans les reglages du depot (Dependabot security updates).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns: ["*"]
+  # Chart.yaml (dependances) et images de values.yaml. Penser a aligner
+  # appVersion quand l'image de l'agent est bumpee (test chart.bats).
+  - package-ecosystem: helm
+    directory: /charts/monitoring-agent
+    schedule:
+      interval: weekly
+    ignore:
+      # Dependabot ne sait lister les tags ni sur quay.io ni sur registry.k8s.io
+      # (DockerRegistry2::NotFound) et fait alors echouer tout le job. On garde
+      # ces registres (pas de limite de pull anonyme, contrairement a Docker Hub,
+      # pour des images tirees sur chaque node) : bump manuel.
+      - dependency-name: "quay.io/prometheus/node-exporter"
+      - dependency-name: "registry.k8s.io/kube-state-metrics/kube-state-metrics"

@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [helm-chart]
+  pull_request:
+    branches: [helm-chart]
+
+env:
+  CHART: charts/monitoring-agent
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.16.2
+
+      - name: Helm lint
+        run: helm lint "$CHART"
+
+      # Meme lanceur qu'en local (alpine + bats), Docker etant present sur le runner.
+      - name: Tests (bats)
+        run: ./tests/run.sh
+
+      - name: Helm template (toutes les variantes)
+        run: |
+          set -euo pipefail
+          mkdir -p rendered
+          helm template essai "$CHART" > rendered/default.yaml
+          # Tous les deploiements optionnels actives.
+          helm template essai "$CHART" \
+            --set databaseMonitoring.enabled=true \
+            --set rabbitmqMonitoring.enabled=true \
+            --set rabbitmqMonitoring.endpoint=http://rmq:15692/metrics \
+            --set httpProbe.enabled=true \
+            --set 'httpProbe.probes[0].url=https://example.com' > rendered/all.yaml
+
+      - name: Install kubeconform
+        env:
+          KUBECONFORM_VERSION: v0.8.0
+          KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+        run: |
+          set -euo pipefail
+          curl -sSLo kubeconform.tar.gz \
+            "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${KUBECONFORM_SHA256}  kubeconform.tar.gz" | sha256sum -c -
+          tar xzf kubeconform.tar.gz -C "$RUNNER_TEMP" kubeconform
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Valider les manifestes (kubeconform)
+        run: kubeconform -strict -summary -kubernetes-version 1.29.0 rendered/*.yaml

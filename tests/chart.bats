@@ -181,3 +181,73 @@ sys.exit('daemonset $daemonset absent')
   [ "$(printf '%s' "$rendu" | priorite_du_daemonset node-exporter)" = "resource-guaranteed" ]
   [ "$(printf '%s' "$rendu" | priorite_du_daemonset kubelet-cadvisor-pusher)" = "" ]
 }
+
+# ---------------------------------------------------------------------------
+# Modules optionnels (image >= 1.14) et image non-root.
+# ---------------------------------------------------------------------------
+
+@test "bases de donnees : exporters seuls, sans mode OVH" {
+  # ENABLE_OVH_DATABASE sans OVH_DB_* : l'agent refuse de demarrer.
+  rendu=$(helm template essai "$CHART" \
+    --set databaseMonitoring.enabled=true \
+    --set 'databaseMonitoring.extraEnv[0].name=POSTGRES_EXPORTER_1_URL' \
+    --set 'databaseMonitoring.extraEnv[0].value=http://pg:9187/metrics')
+  [ "$(printf '%s' "$rendu" | env_du_deploiement database-monitoring POSTGRES_EXPORTER_1_URL)" = "http://pg:9187/metrics" ]
+  ! printf '%s' "$rendu" | grep -q 'ENABLE_OVH_DATABASE'
+}
+
+@test "bases de donnees : mode OVH active des qu'une OVH_DB_* est fournie" {
+  rendu=$(helm template essai "$CHART" \
+    --set databaseMonitoring.enabled=true \
+    --set 'databaseMonitoring.extraEnv[0].name=OVH_DB_1_URL' \
+    --set 'databaseMonitoring.extraEnv[0].value=x')
+  [ "$(printf '%s' "$rendu" | env_du_deploiement database-monitoring ENABLE_OVH_DATABASE)" = "true" ]
+}
+
+@test "vernemq : endpoint transmis, push node-exporter coupe" {
+  rendu=$(helm template essai "$CHART" \
+    --set vernemqMonitoring.enabled=true \
+    --set vernemqMonitoring.endpoint=http://vmq:8888/metrics)
+  [ "$(printf '%s' "$rendu" | env_du_deploiement vernemq-monitoring VERNEMQ_ENDPOINT)" = "http://vmq:8888/metrics" ]
+  [ "$(printf '%s' "$rendu" | env_du_deploiement vernemq-monitoring ENABLE_STANDARD)" = "false" ]
+}
+
+@test "crowdsec : endpoints et bouncers ignores transmis, push node-exporter coupe" {
+  rendu=$(helm template essai "$CHART" \
+    --set crowdsecMonitoring.enabled=true \
+    --set crowdsecMonitoring.endpoint=http://cs:6060/metrics \
+    --set crowdsecMonitoring.bouncerEndpoint=http://fw:60601/metrics \
+    --set 'crowdsecMonitoring.ignoredBouncers=a\,b')
+  [ "$(printf '%s' "$rendu" | env_du_deploiement crowdsec-monitoring CROWDSEC_ENDPOINT)" = "http://cs:6060/metrics" ]
+  [ "$(printf '%s' "$rendu" | env_du_deploiement crowdsec-monitoring CROWDSEC_BOUNCER_ENDPOINT)" = "http://fw:60601/metrics" ]
+  [ "$(printf '%s' "$rendu" | env_du_deploiement crowdsec-monitoring CROWDSEC_IGNORED_BOUNCERS)" = "a,b" ]
+  [ "$(printf '%s' "$rendu" | env_du_deploiement crowdsec-monitoring ENABLE_STANDARD)" = "false" ]
+}
+
+@test "vernemq et crowdsec sont desactives par defaut" {
+  rendu=$(helm template essai "$CHART")
+  ! printf '%s' "$rendu" | grep -qE 'VERNEMQ_ENDPOINT|CROWDSEC_'
+}
+
+@test "tous les conteneurs agent tournent en non-root" {
+  rendu=$(helm template essai "$CHART" \
+    --set databaseMonitoring.enabled=true \
+    --set rabbitmqMonitoring.enabled=true \
+    --set vernemqMonitoring.enabled=true \
+    --set crowdsecMonitoring.enabled=true \
+    --set httpProbe.enabled=true \
+    --set 'httpProbe.probes[0].url=https://example.com')
+  printf '%s' "$rendu" | python3 -c "
+import sys, yaml
+n = 0
+for doc in yaml.safe_load_all(sys.stdin):
+    if not doc or doc.get('kind') not in ('Deployment', 'DaemonSet'): continue
+    for c in doc['spec']['template']['spec']['containers']:
+        if c['name'] != 'agent': continue
+        n += 1
+        sc = c.get('securityContext') or {}
+        assert sc.get('runAsNonRoot') is True, doc['metadata']['name']
+        assert sc.get('allowPrivilegeEscalation') is False, doc['metadata']['name']
+assert n == 9, f'{n} conteneurs agent'
+"
+}

@@ -23,6 +23,8 @@ spec:
       containers:
         - name: agent
           image: {{ .Values.agent.image }}
+          securityContext:
+            {{- toYaml .Values.agent.securityContext | nindent 12 }}
           env:
             # Ce pod n'embarque pas de node-exporter. Sans cette ligne,
             # config.sh retombe sur MODE=standard et l'agent scrape

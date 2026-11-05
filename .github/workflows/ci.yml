@@ -37,6 +37,10 @@ jobs:
             --set databaseMonitoring.enabled=true \
             --set rabbitmqMonitoring.enabled=true \
             --set rabbitmqMonitoring.endpoint=http://rmq:15692/metrics \
+            --set vernemqMonitoring.enabled=true \
+            --set vernemqMonitoring.endpoint=http://vmq:8888/metrics \
+            --set crowdsecMonitoring.enabled=true \
+            --set crowdsecMonitoring.endpoint=http://cs:6060/metrics \
             --set httpProbe.enabled=true \
             --set 'httpProbe.probes[0].url=https://example.com' > rendered/all.yaml
 

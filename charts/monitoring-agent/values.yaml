@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 agent:
-  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.9.0"
+  image: "ghcr.io/matvi-consulting/monitoring-agent-docker:1.15.1"
   url: "https://push.prod.matvi-consulting.com"   # sans le suffixe /metrics
   basicAuth:
     username: ""
@@ -15,6 +15,16 @@ agent:
     cluster: ""
     env: ""
     client: ""
+  # L'image tourne en utilisateur non-root (UID 10001).
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
   resources:
     requests: { cpu: 200m, memory: 50Mi }
     limits:   { cpu: 250m, memory: 100Mi }
@@ -27,6 +37,10 @@ agent:
   databaseMonitoring:
     pushInterval: 30
   rabbitmqMonitoring:
+    pushInterval: 30
+  vernemqMonitoring:
+    pushInterval: 30
+  crowdsecMonitoring:
     pushInterval: 30
   httpProbe:
     pushInterval: 30
@@ -64,7 +78,15 @@ kubeStateMetrics:
 
 databaseMonitoring:
   enabled: false
+  # BDD OVH (OVH_DB_N_*) et/ou exporters BDD auto-hebergees, scrapes par
+  # l'agent : MYSQL_EXPORTER_N_*, POSTGRES_EXPORTER_N_*, REDIS_EXPORTER_N_*,
+  # MONGODB_EXPORTER_N_* (URL, NAME, USER/PASSWORD optionnels).
+  # Le mode OVH n'est active que si des variables OVH_DB_* sont presentes.
   extraEnv: []
+  # - name: MYSQL_EXPORTER_1_URL
+  #   value: "http://mysqld-exporter.db.svc.cluster.local:9104/metrics"
+  # - name: MYSQL_EXPORTER_1_NAME
+  #   value: "mysql-main"
   # - name: OVH_DB_1_URL
   #   value: "my-value"
   # - name: OVH_DB_1_NAME
@@ -93,6 +115,19 @@ rabbitmqMonitoring:
   # aucune ligne, l'agent le signale dans ses logs.
   excludedQueues: ""
   # excludedQueues example: "data.copy,life.copy"
+
+# VerneMQ (MQTT) : exporter natif du broker.
+vernemqMonitoring:
+  enabled: false
+  endpoint: ""
+  # endpoint example: "http://vernemq.mqtt.svc.cluster.local:8888/metrics"
+
+# CrowdSec : moteur et/ou bouncer, chacun optionnel.
+crowdsecMonitoring:
+  enabled: false
+  endpoint: ""          # ex. "http://crowdsec-service.crowdsec.svc.cluster.local:6060/metrics"
+  bouncerEndpoint: ""   # ex. "http://<bouncer>:60601/metrics"
+  ignoredBouncers: ""   # noms exacts, separes par des virgules
 
 # Sonde HTTP : pod dedie, sans exporter local. Il vise le DOMAINE PUBLIC des
 # sites (pas un Service interne) pour tester aussi le DNS public et le TLS.

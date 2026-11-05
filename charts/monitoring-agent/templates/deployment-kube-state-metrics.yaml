@@ -33,6 +33,8 @@ spec:
             {{- toYaml .Values.kubeStateMetrics.resources | nindent 12 }}
         - name: agent
           image: {{ .Values.agent.image }}
+          securityContext:
+            {{- toYaml .Values.agent.securityContext | nindent 12 }}
           env:
             - name: ENABLE_KUBE_STATE_METRICS
               value: "true"

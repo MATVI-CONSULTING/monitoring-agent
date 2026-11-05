@@ -55,6 +55,8 @@ spec:
               readOnly: true
         - name: agent
           image: {{ .Values.agent.image }}
+          securityContext:
+            {{- toYaml .Values.agent.securityContext | nindent 12 }}
           env:
             - name: ENABLE_NODE_EXPORTER_K8S
               value: "true"

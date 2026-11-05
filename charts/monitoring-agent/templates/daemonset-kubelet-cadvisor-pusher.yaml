@@ -28,6 +28,8 @@ spec:
       containers:
         - name: agent
           image: {{ .Values.agent.image }}
+          securityContext:
+            {{- toYaml .Values.agent.securityContext | nindent 12 }}
           imagePullPolicy: IfNotPresent
           env:
             - name: ENABLE_CADVISOR

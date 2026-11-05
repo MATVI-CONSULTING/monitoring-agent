@@ -1,0 +1,58 @@
+{{- if .Values.vernemqMonitoring.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "chart.fullname" . }}-vernemq-monitoring
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "chart.selectorLabels" . | nindent 6 }}
+      app: vernemq-monitoring
+  template:
+    metadata:
+      labels:
+        {{- include "chart.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        app: vernemq-monitoring
+    spec:
+      serviceAccountName: {{ include "chart.fullname" . }}-vernemq-monitoring
+      containers:
+        - name: agent
+          image: {{ .Values.agent.image }}
+          securityContext:
+            {{- toYaml .Values.agent.securityContext | nindent 12 }}
+          env:
+            # Pas de node-exporter dans ce pod : cf. deployment-rabbitmq-monitoring.yaml.
+            - name: ENABLE_STANDARD
+              value: "false"
+            - name: VERNEMQ_ENDPOINT
+              value: "{{ .Values.vernemqMonitoring.endpoint }}"
+            - name: PUSH_INTERVAL
+              value: "{{ .Values.agent.vernemqMonitoring.pushInterval }}"
+            - name: INSTANCE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CLUSTER
+              value: "{{ default .Release.Namespace .Values.agent.labels.cluster }}"
+            - name: ENV
+              value: "{{ .Values.agent.labels.env }}"
+            - name: CUSTOMER_NAME
+              value: "{{ default .Release.Namespace .Values.agent.labels.client }}"
+            - name: AGENT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: username
+            - name: AGENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "chart.fullname" . }}-agent-basic-auth
+                  key: password
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+{{- end }}

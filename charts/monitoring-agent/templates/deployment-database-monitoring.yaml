@@ -23,6 +23,8 @@ spec:
       containers:
         - name: agent
           image: {{ .Values.agent.image }}
+          securityContext:
+            {{- toYaml .Values.agent.securityContext | nindent 12 }}
           env:
             {{- with .Values.databaseMonitoring.extraEnv }}
               {{- toYaml . | nindent 12 }}
@@ -33,8 +35,16 @@ spec:
             # allume InstanceUpStatusDown en permanence.
             - name: ENABLE_STANDARD
               value: "false"
+            {{- $ovh := false }}
+            {{- range .Values.databaseMonitoring.extraEnv }}
+            {{- if hasPrefix "OVH_DB_" .name }}{{ $ovh = true }}{{ end }}
+            {{- end }}
+            {{- if $ovh }}
+            # Mode OVH seulement si des OVH_DB_* sont fournies : sinon l'agent
+            # refuse de demarrer, meme avec des exporters configures.
             - name: ENABLE_OVH_DATABASE
               value: "true"
+            {{- end }}
             - name: PUSH_INTERVAL
               value: "{{ .Values.agent.databaseMonitoring.pushInterval }}"
             - name: INSTANCE

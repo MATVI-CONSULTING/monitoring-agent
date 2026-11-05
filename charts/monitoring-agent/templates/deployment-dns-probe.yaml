@@ -24,6 +24,8 @@ spec:
       containers:
         - name: agent
           image: {{ .Values.agent.image }}
+          securityContext:
+            {{- toYaml .Values.agent.securityContext | nindent 12 }}
           env:
             # Mode dedie : ce pod n'a aucun exporter local a scraper. Sans ce
             # flag l'agent tomberait en mode standard et pousserait un

@@ -111,6 +111,19 @@ Vérifie que chaque host déclaré dans un Ingress résout en DNS public, et rem
 
 Métriques : `dns_probe_success{namespace,ingress,host,rcode}`, `dns_probe_answer{namespace,ingress,host,ip}` (`job=dns-probe`), et `external_dns_controller_*`, `external_dns_registry_*`, `external_dns_source_*`, `external_dns_scrape_up` (`job=external-dns`). La comparaison avec l'IP du load balancer est faite côté règles Prometheus, par jointure avec `kube_service_status_load_balancer_ingress`.
 
+### 🧩 Modules optionnels
+
+Désactivés par défaut, chacun dans un pod dédié.
+
+| Valeur | Description |
+|--------|-------------|
+| `databaseMonitoring.enabled` + `extraEnv` | BDD OVH (`OVH_DB_N_*`) et/ou exporters MySQL/MariaDB, PostgreSQL, Redis/Valkey, MongoDB (`<TYPE>_EXPORTER_N_URL`, `_NAME`, `_USER`, `_PASSWORD`) |
+| `rabbitmqMonitoring.enabled` + `endpoint` | Plugin Prometheus de RabbitMQ |
+| `vernemqMonitoring.enabled` + `endpoint` | Exporter natif de VerneMQ |
+| `crowdsecMonitoring.enabled` + `endpoint` / `bouncerEndpoint` | Moteur et/ou bouncer CrowdSec (`ignoredBouncers` optionnel) |
+
+Les conteneurs de l'agent tournent en non-root (`agent.securityContext`).
+
 ### 🔐 Secrets nécessaires
 
 Si votre agent doit pousser les métriques vers une cible sécurisée (API key, token, etc.), vous devez créer un secret Kubernetes avant d’installer le chart.

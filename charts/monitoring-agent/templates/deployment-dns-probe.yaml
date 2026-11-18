@@ -43,6 +43,9 @@ spec:
               value: "{{ .Values.dnsProbe.timeout }}"
             - name: DNS_PROBE_EXCLUDE_HOSTS
               value: {{ .Values.dnsProbe.excludeHosts | quote }}
+            # « nom=cidr » separes par des espaces, depuis dnsProbe.cdnCidrs.
+            - name: DNS_PROBE_CDN_CIDRS
+              value: {{ include "chart.dnsProbeCdnCidrs" . | quote }}
             # Toujours posee, meme vide : l'agent lit une variable ABSENTE
             # comme « auto » et une variable VIDE comme « desactive ».
             - name: EXTERNAL_DNS_SCRAPE_URL

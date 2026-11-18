@@ -122,6 +122,30 @@ for doc in yaml.safe_load_all(sys.stdin):
   ! printf '%s' "$rendu" | grep -q 'ENABLE_DNS_PROBE_ONLY'
 }
 
+@test "la sonde DNS transmet les plages Cloudflare par defaut" {
+  # Cas reel Qualisocial (18/11/2026) : hosts derriere Cloudflare en proxy.
+  rendu=$(helm template essai "$CHART")
+  valeur=$(printf '%s' "$rendu" | env_du_deploiement dns-probe DNS_PROBE_CDN_CIDRS)
+  for cidr in 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13; do
+    [[ " $valeur " == *" cloudflare=${cidr} "* ]] || { echo "cloudflare=${cidr} absent de '$valeur'"; false; }
+  done
+  [ "$(printf '%s' "$valeur" | wc -w)" -eq 15 ]
+}
+
+@test "la sonde DNS : un CDN s'ajoute a Cloudflare, ou le remplace, ou rien" {
+  # Helm fusionne les maps : un CDN ajoute s'ajoute a cloudflare ; « cloudflare: null » le retire.
+  fichier="$BATS_TEST_TMPDIR/cdn.yaml"
+  printf 'dnsProbe:\n  cdnCidrs: null\n' > "$fichier"
+  printf 'dnsProbe:\n  cdnCidrs:\n    zeta: [10.0.0.0/8]\n    alpha: [192.0.2.0/24, 198.51.100.0/24]\n' > "$BATS_TEST_TMPDIR/autres.yaml"
+  valeur=$(helm template essai "$CHART" -f "$BATS_TEST_TMPDIR/autres.yaml" | env_du_deploiement dns-probe DNS_PROBE_CDN_CIDRS)
+  [[ "$valeur" == "alpha=192.0.2.0/24 alpha=198.51.100.0/24 cloudflare="*" zeta=10.0.0.0/8" ]] || { echo "vaut '$valeur'"; false; }
+  printf 'dnsProbe:\n  cdnCidrs:\n    cloudflare: null\n    alpha: [192.0.2.0/24]\n' > "$BATS_TEST_TMPDIR/remplace.yaml"
+  valeur=$(helm template essai "$CHART" -f "$BATS_TEST_TMPDIR/remplace.yaml" | env_du_deploiement dns-probe DNS_PROBE_CDN_CIDRS)
+  [ "$valeur" = "alpha=192.0.2.0/24" ] || { echo "vaut '$valeur'"; false; }
+  valeur=$(helm template essai "$CHART" -f "$fichier" | env_du_deploiement dns-probe DNS_PROBE_CDN_CIDRS)
+  [ -z "$valeur" ] || { echo "vaut '$valeur'"; false; }
+}
+
 @test "la sonde DNS transmet exclusions, resolveurs et external-dns" {
   rendu=$(helm template essai "$CHART" \
     --set 'dnsProbe.excludeHosts=^preview-.*' \

@@ -106,10 +106,11 @@ Vérifie que chaque host déclaré dans un Ingress résout en DNS public, et rem
 | `dnsProbe.resolvers` | Résolveurs, essayés dans l'ordre | `1.1.1.1 8.8.8.8` |
 | `dnsProbe.timeout` | Timeout d'une requête, en secondes | `2` |
 | `dnsProbe.excludeHosts` | Regex étendue des hosts à ne pas sonder | `""` |
+| `dnsProbe.cdnCidrs` | Plages IPv4 des CDN en mode proxy, par nom (`cloudflare: [...]`). Une IP résolue dedans porte `cdn="<nom>"` et n'est pas comparée au load balancer. `cloudflare: null` retire Cloudflare | plages Cloudflare |
 | `externalDns.scrapeUrl` | `auto`, `""` (désactivé) ou URL explicite | `auto` |
 | `agent.dnsProbe.pushInterval` | Intervalle de push des dernières mesures | `30` |
 
-Métriques : `dns_probe_success{namespace,ingress,host,rcode}`, `dns_probe_answer{namespace,ingress,host,ip}` (`job=dns-probe`), et `external_dns_controller_*`, `external_dns_registry_*`, `external_dns_source_*`, `external_dns_scrape_up` (`job=external-dns`). La comparaison avec l'IP du load balancer est faite côté règles Prometheus, par jointure avec `kube_service_status_load_balancer_ingress`.
+Métriques : `dns_probe_success{namespace,ingress,host,rcode}`, `dns_probe_answer{namespace,ingress,host,ip[,cdn]}` (`job=dns-probe`), et `external_dns_controller_*`, `external_dns_registry_*`, `external_dns_source_*`, `external_dns_scrape_up` (`job=external-dns`). La comparaison avec l'IP du load balancer est faite côté règles Prometheus, par jointure avec `kube_service_status_load_balancer_ingress`.
 
 ### 🧩 Modules optionnels
 

@@ -60,3 +60,17 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Plages CDN de la sonde DNS, au format de DNS_PROBE_CDN_CIDRS : « nom=cidr »
+separes par des espaces. Noms tries pour un rendu stable.
+*/}}
+{{- define "chart.dnsProbeCdnCidrs" -}}
+{{- $entrees := list -}}
+{{- range $nom := keys (default dict .Values.dnsProbe.cdnCidrs) | sortAlpha -}}
+{{- range $cidr := index $.Values.dnsProbe.cdnCidrs $nom -}}
+{{- $entrees = append $entrees (printf "%s=%s" $nom $cidr) -}}
+{{- end -}}
+{{- end -}}
+{{- join " " $entrees -}}
+{{- end -}}
